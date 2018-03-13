@@ -36,12 +36,15 @@ This project is designed to grab the output of the `bin/kafka-consumergroups.sh`
 
 We could have accomplished this using the [Dynatrace OneAgent SDK](#https://dynatrace.github.io/plugin-sdk/index.html), and pushed metrics directly to the JVM pgi (process group instance) of each Broker.  This would have been a perfectly acceptable use case.  We could also push metrics directly to the JVM pgi of each Consumer.  But these are endeavors for other projects.
 
-In this project, we wanted to tackle a multidimensional dataset and explore how to use the Dynatrace API to push that dataset into Dynatrace.  Consumer Lag is also interesting because the data entites are very dynamic - Consumer Groups and topics are often created and destroyed from week to week or month to month as different teams leverage the Kafka cluster.  So, Consumer Lag is interesting use case to show the flexibility and power of performing on-the-fly metric creation using the Dynatrace API (see [Example output](#example-output) and )
+In this project, we wanted to tackle a multidimensional dataset and explore how to use the Dynatrace API to push that dataset into Dynatrace.  Consumer Lag is also interesting because the data entites are very dynamic - Consumer Groups and topics are often created and destroyed from week to week or month to month as different teams leverage the Kafka cluster.
+
+So, Consumer Lag is interesting use case to show the flexibility and power of performing on-the-fly metric creation using the Dynatrace API (see [Example output](#example-output) and [Main Loop](#main-loop) for more info regarding the on-the-fly metric creation.)
 
 
 ### Simple Run
 
 - Essential requirements: Python 3.6 with `requests` and `pyyaml`
+- Ensure you have a custom device configured on your Tenant (see [Detail of Operations](#detail-of-operations))
 - Configure this file: `consumerlag.yaml`
 - Run:  `python consumerlag.py`
 
@@ -164,12 +167,12 @@ https://www.dynatrace.com/support/help/dynatrace-api/timeseries/what-does-the-cu
 The main configuration file is `consumerlag.yaml`
 
 - `authentication_list`: this is the Dynatrace API token that you need to create on your tenant.
-See this URL to create your API token: https://{id}.live.dynatrace.com/#settings/integration/apikeys
+See this URL to create your API token: https://zzz00000.live.dynatrace.com/#settings/integration/apikeys
 Only one token is supported right now but in the future it could support multiple tokens (and Tenants)
-- `url_tenant`: this is the full URL of your Tenant: https://{id}.live.dynatrace.com
+- `url_tenant`: this is the full URL of your Tenant: https://zzz00000.live.dynatrace.com
 - `bootstrap`: this is the `name:port` that your Broker listens on
 - `custom_device` Every Dynatrace Custom Device needs a unique name when you push to it.
-https://{id}.live.dynatrace.com/api/v1/entity/infrastructure/custom/MY_CUSTOMDEVICENAME_WHICH_I_MADE_UP_MYSELF
+https://zzz00000.live.dynatrace.com/api/v1/entity/infrastructure/custom/MY_CUSTOMDEVICENAME_WHICH_I_MADE_UP_MYSELF
 - `check_metrics_every_x_loops`: The script will query for all Metrics and compare that list against the current Consumer Group list.  If there are new Consumer Groups, the code will create new custom metrics on-the-fly for those new Consumer Groups.
 - `development: False`: this should only be True if you're testing in your Python IDE and you want dummmy data to work with
 - `debug: True`: There are a few debug log lines.  Set to `False` to be more minimal in your logging.
@@ -200,7 +203,7 @@ These are the basic steps to pushing these metrics:
 - Create the custom device at a unique URL and register it with the `custom:device.heartbeat.count` metric.
   - You can find the code in `consumerlag_singleexecutions.py` within the `define_custom_device` function examples.
   If the API call is successful, you receive a 202 HTTP status code response and the `entityId` of your new custom device.
-  Record the "CUSTOM_DEVICE-GUID" if you want to reach the Custom Device URL at: https://{id}.live.dynatrace.com/#entity;id=**CUSTOM_DEVICE-GUID**;gtf=l_2_HOURS
+  Record the "CUSTOM_DEVICE-GUID" if you want to reach the Custom Device URL at: https://zzz00000.live.dynatrace.com/#entity;id=**CUSTOM_DEVICE-GUID**;gtf=l_2_HOURS
 
 - Run: `python consumerlag.py`
   - This will query Kafka for all Consumer Groups and ensure they exist on the destination Tenant in this format:
