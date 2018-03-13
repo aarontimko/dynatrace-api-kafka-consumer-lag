@@ -1,0 +1,27 @@
+
+# Any Alexis application can use this authentication list definition
+authentication_list:
+  # Required keys: name, type, description, headers
+
+  - unique_name: 'dynatrace_syn_day'
+    type: 'dynatrace'
+    description: 'Alexis 2.0 - Syn.Day'
+    headers: '{"Authorization":"Api-Token sdfj3kvkdrj34kjdfkw35"}'
+
+# Dynatrace tenant
+url_tenant: 'https://zzz00000.live.dynatrace.com'
+
+# Broker address
+bootstrap: 'localhost:9092'
+
+# Dynatrace Custom Device Unique Name (where we push the metrics)
+custom_device: 'KafkaClusterTest01'
+
+# Check for new Metrics (e.g. New Consumer Groups) every X loops
+check_metrics_every_x_loops: 1000
+
+# Enable this for simulating Kafka interaction for local development
+development: True
+
+# Enable this for enabling debug output
+debug: True
