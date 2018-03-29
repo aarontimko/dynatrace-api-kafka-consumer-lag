@@ -296,8 +296,10 @@ common.default.app_logfile = os.path.join(common.default.app_logdir,
 conf_file = 'consumerlag.yaml'
 app_conf = grab_yaml_from_disk(conf_file)
 
-headers_sample = '{"Authorization":"Api-Token sdfj3kvkdrj34kjdfkw35"}'
-f_headers = json.loads(headers_sample.replace("'", '"'))
+authentication_list = app_conf['authentication_list']
+authentication = authentication_list[0]
+headers = authentication['headers']
+f_headers = json.loads(headers.replace("'", '"'))
 
 url_tenant = app_conf['url_tenant']
 pp = pprint.PrettyPrinter(indent=4)
@@ -444,7 +446,7 @@ expand_start = True
 expand_end = True
 
 
-# CREATE CONSUMER GROUPS MANUALLY
+# CREATE CONSUMER GROUP METRICS MANUALLY
 expand_start = True
 # Grab Consumer Group List
 # consumer_group_list = \
@@ -465,13 +467,13 @@ expand_start = True
 #
 # for consumer_group in consumer_group_list:
 #
-#     dt_metrics_list = obtain_timeseries_metrics(
-#         url_tenant=url_tenant,
-#         f_headers=f_headers,
-#         log_category='APICall',
-#         error_msg="unable to obtain metrics list",
-#         log_key='url_tenant',
-#         log_value=url_tenant)
+    dt_metrics_list = obtain_timeseries_metrics(
+        url_tenant=url_tenant,
+        f_headers=f_headers,
+        log_category='APICall',
+        error_msg="unable to obtain metrics list",
+        log_key='url_tenant',
+        log_value=url_tenant)
 #
 #     create_metric_response = create_kafkalag_metric(
 #         url_tenant=url_tenant,

@@ -21,7 +21,38 @@ custom_device: 'KafkaClusterTest01'
 check_metrics_every_x_loops: 1000
 
 # Enable this for simulating Kafka interaction for local development
-development: True
+development: False
 
 # Enable this for enabling debug output
 debug: True
+
+# Set Threshold Defaults and Overrides
+default_threshold: 'DEFAULT_CONSUMER_GROUP'
+
+threshold_list:
+
+  - consumer_group: 'DEFAULT_CONSUMER_GROUP'
+    threshold: '10000'
+    alertCondition: 'ABOVE'
+    samples: '10'
+    violatingSamples: '5'
+    dealertingSamples: '5'
+    eventType: 'PERFORMANCE_EVENT'
+    #Optional: use $consumer_group as replacement text
+    eventName: '$consumer_group Consumer Lag is High'
+    #Optional: use $consumer_group as replacement text
+    description: 'For $consumer_group, we discovered Consumer Lag of {severity} that is {alert_condition} the threshold of {threshold}'
+
+  - consumer_group: 'MongoInserter'
+    threshold: '12000'
+    alertCondition: 'ABOVE'
+    samples: '10'
+    violatingSamples: '5'
+    dealertingSamples: '5'
+    eventType: 'PERFORMANCE_EVENT'
+    #Optional: use $consumer_group as replacement text
+    eventName: '$consumer_group Consumer Lag is High'
+    #Optional: use $consumer_group as replacement text
+    description: 'For $consumer_group, we discovered Consumer Lag of {severity} that is {alert_condition} the threshold of {threshold}'
+
+

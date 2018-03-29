@@ -176,6 +176,8 @@ https://zzz00000.live.dynatrace.com/api/v1/entity/infrastructure/custom/MY_CUSTO
 - `check_metrics_every_x_loops`: The script will query for all Metrics and compare that list against the current Consumer Group list.  If there are new Consumer Groups, the code will create new custom metrics on-the-fly for those new Consumer Groups.
 - `development: False`: this should only be True if you're testing in your Python IDE and you want dummmy data to work with
 - `debug: True`: There are a few debug log lines.  Set to `False` to be more minimal in your logging.
+- `default_threshold`: name of the default threshold settings in the `threshold_list`
+- `threshold_list`: a default threshold and other threshold overrides
 
 
 ### Detail of Operations
@@ -205,6 +207,9 @@ These are the basic steps to pushing these metrics:
   If the API call is successful, you receive a 202 HTTP status code response and the `entityId` of your new custom device.
   Record the "CUSTOM_DEVICE-GUID" if you want to reach the Custom Device URL at: https://zzz00000.live.dynatrace.com/#entity;id=**CUSTOM_DEVICE-GUID**;gtf=l_2_HOURS
 
+- Determine your threshold values and settings under `threshold_list` in the `consumerlag.yaml` file.
+  - Update as necessary
+
 - Run: `python consumerlag.py`
   - This will query Kafka for all Consumer Groups and ensure they exist on the destination Tenant in this format:
   custom:kafka.consumerlag.**CONSUMER_GROUP_NAME**.count
@@ -224,7 +229,11 @@ The `consumerlag.py` script will do the following:
 - on the 1st run and every X runs (denoted by `check_metrics_every_x_loops`)
   - grab the full list of metrics `obtain_timeseries_metrics()`
   - create a metric for each Consumer Group if it does not exist `create_kafkalag_metric()`
-- query Kafka for the lag for each Consumer Gorup, sum the lag for each topic `obtain_kafka_consumer_lag()`
+- on the 1st run, the script will ALSO create custom thresholds for every metric by doing the following:
+  - grab the `threshold_list` from the `consumerlag.yaml` file
+  - use the `default_threshold` settings to dynamically create thresholds for each metric
+  - if overridden with a manual entry (e.g. `consumer_group: 'MongoInserter'`), it will use those values instead for that consumer_group
+- query Kafka for the lag for each Consumer Group, sum the lag for each topic `obtain_kafka_consumer_lag()`
 (this uses the Kafka command: `/opt/broker/bin/kafka-consumer-groups.sh --new-consumer --describe --group`)
 - append each metric for each ConsumerGroup+Topic to the custom metric json syntax `append_custom_metrics()`
 - at the end of all the individual metric appends, push with 1 API call the full custom metrics JSON to the Dynatrace custom device `push_custom_metrics()`
@@ -234,3 +243,4 @@ The `consumerlag.py` script will do the following:
 ### Versions
 
 v1.01 - Initial commit
+v1.02 - Added the ability to create custom thresholds on-the-fly, driven by configuration (see `threshold_list`)
