@@ -4,13 +4,12 @@ from itertools import islice
 import requests
 import urllib.parse
 import json
-import requests
 import pprint
 
 import common
 from common.default import *
 
-def obtain_kafka_consumer_groups(bootstrap):
+def obtain_kafka_consumer_groups(kafka_consumer_groups_list):
     """
     Obtains the output from this Kafka utility command:
      /opt/broker/bin/kafka-consumer-groups.sh --new-consumer --list
@@ -41,13 +40,14 @@ def obtain_kafka_consumer_groups(bootstrap):
         string = None
 
         try:
-            string = subprocess.check_output([
-                "/opt/broker/bin/kafka-consumer-groups.sh",
-                "--new-consumer",
-                "--bootstrap-server",
-                bootstrap,
-                "--list"
-            ])
+            string = subprocess.check_output(kafka_consumer_groups_list)
+            # string = subprocess.check_output([
+            #     "/opt/broker/bin/kafka-consumer-groups.sh",
+            #     "--new-consumer",
+            #     "--bootstrap-server",
+            #     bootstrap,
+            #     "--list"
+            # ])
         except Exception as e:
             print('Unable to grab consumer groups: '+e.__str__())
 
@@ -68,7 +68,7 @@ def obtain_kafka_consumer_groups(bootstrap):
     return sorted_list
 
 
-def obtain_kafka_consumer_lag(bootstrap, consumer_group):
+def obtain_kafka_consumer_lag(kafka_consumer_groups_describe, consumer_group):
     """
     Obtains the output from this Kafka utility command:
     /opt/broker/bin/kafka-consumer-groups.sh --new-consumer --describe --group
@@ -114,15 +114,19 @@ def obtain_kafka_consumer_lag(bootstrap, consumer_group):
         string = None
 
         try:
-            string = subprocess.check_output([
-                "/opt/broker/bin/kafka-consumer-groups.sh",
-                "--new-consumer",
-                "--bootstrap-server",
-                bootstrap,
-                "--describe",
-                "--group",
-                consumer_group
-            ])
+            command = kafka_consumer_groups_describe.copy()
+            command.append("--group")
+            command.append(consumer_group)
+            string = subprocess.check_output(command)
+            # string = subprocess.check_output([
+            #     "/opt/broker/bin/kafka-consumer-groups.sh",
+            #     "--new-consumer",
+            #     "--bootstrap-server",
+            #     bootstrap,
+            #     "--describe",
+            #     "--group",
+            #     consumer_group
+            # ])
         except Exception as e:
             print('Unable to grab lag for consumer_group='
                   + consumer_group+' error='+e.__str__())
@@ -658,7 +662,8 @@ headers = authentication['headers']
 f_headers = json.loads(headers.replace("'", '"'))
 
 url_tenant = app_conf['url_tenant']
-bootstrap = app_conf['bootstrap']
+kafka_consumer_groups_list = app_conf['kafka_consumer_groups_list']
+kafka_consumer_groups_describe = app_conf['kafka_consumer_groups_describe']
 endpoint_custom_device = app_conf['custom_device']
 check_metrics_every_x_loops = int(app_conf['check_metrics_every_x_loops'])
 
@@ -717,77 +722,85 @@ while True:
     #  Grab Consumer Group List
     log_to_disk('GetConsumerGroups',
                 msg="Starting",
-                kv=kvalue(bootstrap=bootstrap))
+                kv=kvalue(kafka_consumer_groups_list=kafka_consumer_groups_list))
 
-    consumer_group_list = \
-        obtain_kafka_consumer_groups(bootstrap=bootstrap)
+    consumer_groups_list = \
+        obtain_kafka_consumer_groups(kafka_consumer_groups_list=kafka_consumer_groups_list)
 
     log_to_disk('GetConsumerGroups',
                 msg="Results",
-                kv=kvalue(consumer_group_list=consumer_group_list))
+                kv=kvalue(consumer_groups_list=consumer_groups_list))
 
     # If we have run check_metrics_every_x_loops,
     # then we will check for the existence of each metric
     if num_loops == 1 or num_loops % check_metrics_every_x_loops == 0:
 
-        # Grab current list of metrics
-        dt_metrics_list = obtain_timeseries_metrics(
-            url_tenant=url_tenant,
-            f_headers=f_headers,
-            log_category='APICall',
-            error_msg="unable to obtain metrics list",
-            log_key='url_tenant',
-            log_value=url_tenant)
+        # Only interact with Dynatrace if a) not using the sample data, and b) not set to kafka_only
+        if app_conf['development'] != True and app_conf['kafka_only'] != True:
 
-        # Iterate through Consumer Groups
-        for consumer_group in consumer_group_list:
-            # Create the metric
-            create_metric_response = create_kafkalag_metric(
+            # Grab current list of metrics
+            dt_metrics_list = obtain_timeseries_metrics(
                 url_tenant=url_tenant,
                 f_headers=f_headers,
-                dt_metrics_list=dt_metrics_list,
-                consumer_group=consumer_group,
                 log_category='APICall',
-                error_msg="unable to create metric",
+                error_msg="unable to obtain metrics list",
                 log_key='url_tenant',
                 log_value=url_tenant)
+
+            # Iterate through Consumer Groups
+            for consumer_group in consumer_groups_list:
+                # Create the metric
+                create_metric_response = create_kafkalag_metric(
+                    url_tenant=url_tenant,
+                    f_headers=f_headers,
+                    dt_metrics_list=dt_metrics_list,
+                    consumer_group=consumer_group,
+                    log_category='APICall',
+                    error_msg="unable to create metric",
+                    log_key='url_tenant',
+                    log_value=url_tenant)
 
     # On the 1st execution,
     # Always create thresholds (with overwrite)
     if num_loops == 1:
 
-        # Retrieve current threshold list
-        threshold_list = get_tenant_threshold_list(
-            url_tenant=url_tenant,
-            f_headers=f_headers,
-            log_category='GetThresholds',
-            error_msg="unable to get thresholds",
-            log_key='url_tenant',
-            log_value=url_tenant,
-            search_threshold='kafka'
-        )
+        # Only interact with Dynatrace if a) not using the sample data, and b) not set to kafka_only
+        if app_conf['development'] != True and app_conf['kafka_only'] != True:
 
-        # Create thresholds (with overwrite)
-        create_kafka_custom_threshold(
-            url_tenant=url_tenant,
-            f_headers=f_headers,
-            dt_threshold_list=threshold_list,
-            consumer_group=consumer_group,
-            log_category='CreateThresholds',
-            error_msg="unable to create threshold",
-            log_key='consumer_group',
-            log_value=consumer_group,
-            overwrite=True)
+            # Retrieve current threshold list
+            threshold_list = get_tenant_threshold_list(
+                url_tenant=url_tenant,
+                f_headers=f_headers,
+                log_category='GetThresholds',
+                error_msg="unable to get thresholds",
+                log_key='url_tenant',
+                log_value=url_tenant,
+                search_threshold='kafka'
+            )
+
+            # Create thresholds (with overwrite)
+            create_kafka_custom_threshold(
+                url_tenant=url_tenant,
+                f_headers=f_headers,
+                dt_threshold_list=threshold_list,
+                consumer_group=consumer_group,
+                log_category='CreateThresholds',
+                error_msg="unable to create threshold",
+                log_key='consumer_group',
+                log_value=consumer_group,
+                overwrite=True)
 
 
     # Continue with processing
     # Grab topics and sum consumer lag by topic
-    for consumer_group in consumer_group_list:
+    for consumer_group in consumer_groups_list:
         log_to_disk('GetLag',
+                    debug=True,
                     msg="Starting",
-                    kv=kvalue(consumer_group=consumer_group))
+                    kv=kvalue(consumer_group=consumer_group,
+                                kafka_consumer_groups_describe=kafka_consumer_groups_describe))
         consumer_group_lag = \
-            obtain_kafka_consumer_lag(bootstrap=bootstrap,
+            obtain_kafka_consumer_lag(kafka_consumer_groups_describe=kafka_consumer_groups_describe,
                                       consumer_group=consumer_group)
 
         log_to_disk('GetLag',
@@ -817,15 +830,18 @@ while True:
                 msg="JSON",
                 kv=kvalue(metrics_to_push=metrics_to_push))
 
-    push_custom_metrics(url_tenant=url_tenant,
-                        f_headers=f_headers,
-                        custom_device=endpoint_custom_device,
-                        dict_metrics=metrics_to_push,
-                        log_category='APICall',
-                        error_msg="unable to push metrics",
-                        log_key='url_tenant',
-                        log_value=url_tenant
-                        )
+    # Only interact with Dynatrace if a) not using the sample data, and b) not set to kafka_only
+    if app_conf['development'] != True and app_conf['kafka_only'] != True:
+
+        push_custom_metrics(url_tenant=url_tenant,
+                            f_headers=f_headers,
+                            custom_device=endpoint_custom_device,
+                            dict_metrics=metrics_to_push,
+                            log_category='APICall',
+                            error_msg="unable to push metrics",
+                            log_key='url_tenant',
+                            log_value=url_tenant
+                            )
 
     log_to_disk('Loop',
                 msg="Finished",

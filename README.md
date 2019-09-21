@@ -57,7 +57,7 @@ Example Output when new metrics are created (either on the initial loop or every
 
 ```
 2018-03-11 19:31:08,332 [INFO]  ConsumerLag::Loop - Starting url_tenant="https://zzz00000.live.dynatrace.com"
-2018-03-11 19:31:08,332 [INFO]  ConsumerLag::GetConsumerGroups - Starting bootstrap="localhost:7070"
+2018-03-11 19:31:08,332 [INFO]  ConsumerLag::GetConsumerGroups - ConsumerLag::GetConsumerGroups - Starting kafka_consumer_groups_list="['/opt/isv/tools/kafka/bin/kafka-consumer-groups.sh', '--bootstrap-server', 'localhost:9092', '--list', '--command-config', '/tmp/kafka-bin-client.prop']"
 2018-03-11 19:31:11,870 [INFO]  ConsumerLag::GetConsumerGroups - Results consumer_group_list="['ActionEngine', 'DistributionLayerGroup',
 'DynamicAnomalyEngine', 'DynamicAnomalyEngine2', 'HARSplitter', 'KMOffsetCache-wadvglmsb01.dev.saasapm.com', 'MessageExtractor_Key', 'MongoInserter',
 'SAMInserter_day', 'SQLInserterGroup', 'SingleEnhancerConsumer.wayvmdwsenh01.dev.saasapm.com', 'SingleEnhancerConsumer.wayvmdwsenh02.dev.saasapm.com',
@@ -82,7 +82,7 @@ Example output when Consumer Lag is captured, built into a metrics push, and pus
 
 ```
 2018-03-11 21:32:23,914 [INFO]  ConsumerLag::Loop - Starting url_tenant="https://zzz00000.live.dynatrace.com"
-2018-03-11 21:32:23,915 [INFO]  ConsumerLag::GetConsumerGroups - Starting bootstrap="localhost:9092"
+2018-03-11 21:32:23,915 [INFO]  ConsumerLag::GetConsumerGroups - ConsumerLag::GetConsumerGroups - Starting kafka_consumer_groups_list="['/opt/isv/tools/kafka/bin/kafka-consumer-groups.sh', '--bootstrap-server', 'localhost:9092', '--list', '--command-config', '/tmp/kafka-bin-client.prop']"
 2018-03-11 21:32:26,949 [INFO]  ConsumerLag::GetConsumerGroups - Results consumer_group_list="['DynamicAnomalyEngine2', 'HARSplitter',
 'MessageExtractor_Perf_DR', 'MessageExtractor_Perf_SaaS', 'MongoInserter', 'ProductHealthConsumerGroup', 'ProductHealthDFAGroup', 'SyntheticEngine',
 'syntheticengine_wafpsymsyn01', 'syntheticengine_wafpsymsyn02', 'syntheticengine_wafpsymsyn03']"
@@ -122,6 +122,8 @@ python3.6 -m venv venv
 pip install requests
 pip install pyyaml
 ```
+
+You can also see the `pip_env.sh` script as reference.
 
 After you are completed with this manual testing, you can also wrap this in a bash script:
 
@@ -170,11 +172,13 @@ The main configuration file is `consumerlag.yaml`
 See this URL to create your API token: https://zzz00000.live.dynatrace.com/#settings/integration/apikeys
 Only one token is supported right now but in the future it could support multiple tokens (and Tenants)
 - `url_tenant`: this is the full URL of your Tenant: https://zzz00000.live.dynatrace.com
-- `bootstrap`: this is the `name:port` that your Broker listens on
+- `kafka_consumer_groups_list`: this is the full command needed to execute `kafka-consumer-groups.sh --list`.  This is the new method as of v1.0.3 of this repository.  You can leave as 'localhost:9092' or you can specify your Broker `bootstrap` list.  This approach allows you to specify an extra `.prop` file if you have security configuration like an SSL keystore, SASL, etc.  You can also specify an alternate location of *kafka-consumer-groups.sh*.
+- `kafka_consumer_groups_describe`: this is the full command needed to execute `kafka-consumer-groups.sh --describe`.  This is the new method as of v1.0.3 of this repository.  You can leave as 'localhost:9092' or you can specify your Broker `bootstrap` list.  This approach allows you to specify an extra `.prop` file if you have security configuration like an SSL keystore, SASL, etc.  You can also specify an alternate location of *kafka-consumer-groups.sh*.
 - `custom_device` Every Dynatrace Custom Device needs a unique name when you push to it.
 https://zzz00000.live.dynatrace.com/api/v1/entity/infrastructure/custom/MY_CUSTOMDEVICENAME_WHICH_I_MADE_UP_MYSELF
 - `check_metrics_every_x_loops`: The script will query for all Metrics and compare that list against the current Consumer Group list.  If there are new Consumer Groups, the code will create new custom metrics on-the-fly for those new Consumer Groups.
-- `development: False`: this should only be True if you're testing in your Python IDE and you want dummmy data to work with
+- `development: False`: this should only be True if you're testing in your Python IDE and you want dummy data to work with
+- `kafka_only: True`: this should be used if you want to validate your Kafka interaction before any interaction with Dynatrace.  In other words, setting to True means that no calls will be made to the Dynatrace tenant.  When you're ready to begin interaction with your Dynatrace tenant, set to `False`.
 - `debug: True`: There are a few debug log lines.  Set to `False` to be more minimal in your logging.
 - `default_threshold`: name of the default threshold settings in the `threshold_list`
 - `threshold_list`: a default threshold and other threshold overrides
@@ -194,7 +198,7 @@ In sum, the `consumerlag.py` code takes data from a single Kafka cluster and pus
 These are the basic steps to pushing these metrics:
 
 - Edit `consumerlag.yaml` with your Authentication token, Tenant URL, bootstrap URL, and custom_device unique name.
-  - Be sure to set: `development: False` -> this should only be True if you're testing in your Python IDE and you want dummmy data to work with
+  - Be sure to set: `development: False` -> this should only be True if you're testing in your Python IDE and you want dummy data to work with
 
 - Create a `custom:device.heartbeat.count` metric on each Tenant.
   - You can find the code to create this specific metric in `consumerlag_singleexecutions.py`.

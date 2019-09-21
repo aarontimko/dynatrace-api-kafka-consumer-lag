@@ -252,6 +252,101 @@ def grab_runtime_from_disk(file):
                                 "not match token hostname")
 
 
+def try_request(f_url, f_headers, log_category, error_msg,
+                log_key, log_value, f_dict, json_data="", m="get"):
+    """
+    Custom function to error handle Requests and output logging
+    in a standardized format for Alexis
+
+    Attributes:
+        f_url (str): url for requests.get
+        f_headers (dict): auth header in json format
+        log_category (str): for logging, e.g. 'Poll' in "Poller::Poll"
+        error_msg (str): descriptive error message if request fails
+        log_key (str): key which ties all the log events together for reporting
+                    e.g. feed_name, problem_id in Poller
+        log_value (str): unique value for the log_key
+                    e.g. "Test_AllOpenProblems_Syn.Day" -> feed_name value
+                    e.g. "6685385694655871934"          -> problem_id value
+        f_dict (dict): dictionary to store results
+               note: must be defined before this function is called
+        m (str): get, post, put, delete
+    """
+
+    # Attempt requests
+    response = None
+
+    # Determine method type
+    if m == "get":
+        requests_type = requests.get
+    if m == "post":
+        requests_type = requests.post
+    if m == "put":
+        requests_type = requests.put
+    if m == "delete":
+        requests_type = requests.delete
+
+    try:
+        if json_data == "":
+            response = requests_type(f_url, headers=f_headers)
+        else:
+            response = requests_type(f_url, headers=f_headers, json=json_data)
+    except requests.exceptions.RequestException as e:
+        log_to_disk(log_category, lvl='ERROR',
+                    msg="RequestsError "+log_key+"="+log_value,
+                    kv=kvalue(exception=e))
+        log_to_disk(log_category, lvl="ERROR",
+                    msg=error_msg+" "+log_key+"="+log_value,
+                    kv=kvalue(url=f_url))
+
+    # If we received response, continue
+    if response is not None:
+        f_dict['results'] = response
+        f_dict['status_code'] = f_dict['results'].status_code
+        log_to_disk(log_category,
+                    msg="HTTPResponse "+log_key+"="+log_value,
+                    kv=kvalue(requests_status_code=f_dict['status_code']))
+
+        # Non-HTTP 200 response
+        if f_dict['status_code'] >= 400:
+            log_to_disk(log_category, lvl="ERROR",
+                        msg="RequestsResults "+log_key+"="+log_value,
+                        kv=kvalue(requests_content=f_dict['results'].content))
+            return False
+
+        # Check for HTTP 2xx response
+        if 200 <= f_dict['status_code'] <= 299:
+            f_dict['elapsed'] = \
+                str(f_dict['results'].elapsed.microseconds)[:-3]
+
+            # Error handling for json in results.content
+            try:
+                f_dict['json'] = json.loads(f_dict['results'].content)
+            except ValueError:
+                f_dict['json'] = "{}"
+
+            # Optional development logging: output raw f_dict['json']
+            if app_conf['debug'] is True:
+                print('JSON_CONTENT:' + str(f_dict['json']))
+
+            log_to_disk(log_category,
+                        msg="RequestsResults "+log_key+"="+log_value,
+                        kv=kvalue(requests_elapsed_ms=f_dict['elapsed'])
+                        )
+        #return
+        return True
+
+    else:
+        # response is None and no exception was caught
+        log_to_disk(log_category, lvl="ERROR",
+                    msg="requests response is None, no exception caught "+\
+                        log_key+"="+log_value,
+                    kv=kvalue(url=f_url))
+        # return
+        return False
+
+
+
 def start(app_component="Main"):
     """
     Starts the script
