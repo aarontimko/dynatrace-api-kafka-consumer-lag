@@ -11,8 +11,27 @@ authentication_list:
 # Dynatrace tenant
 url_tenant: 'https://zzz00000.live.dynatrace.com'
 
-# Broker address
-bootstrap: 'localhost:9092'
+# kafka-consumer-groups.sh --list command as an array
+# This will be executed as-is
+kafka_consumer_groups_list:
+  - "/opt/isv/tools/kafka/bin/kafka-consumer-groups.sh"
+  - "--bootstrap-server"
+  - "localhost:9092"
+  - "--list"
+  - "--command-config"
+  - "/tmp/kafka-bin-client.prop"
+
+# kafka-consumer-groups.sh --describe command as an array
+# This will be appended with "--group" and each returned Consumer Group from the --list command
+kafka_consumer_groups_describe:
+  - "/opt/isv/tools/kafka/bin/kafka-consumer-groups.sh"
+  - "--bootstrap-server"
+  - "localhost:9092"
+  - "--describe"
+  - "--command-config"
+  - "/tmp/kafka-bin-client.prop"
+# - "--group"  --> This will be handled by the code
+# - group_name --> This will be handled by the code
 
 # Dynatrace Custom Device Unique Name (where we push the metrics)
 custom_device: 'KafkaClusterTest01'
@@ -22,6 +41,9 @@ check_metrics_every_x_loops: 1000
 
 # Enable this for simulating Kafka interaction for local development
 development: False
+
+# Enable this if you want to query Kafka but not interact with Dynatrace
+kafka_only: True
 
 # Enable this for enabling debug output
 debug: True
