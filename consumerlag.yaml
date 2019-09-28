@@ -40,10 +40,13 @@ custom_device: 'KafkaClusterTest01'
 check_metrics_every_x_loops: 1000
 
 # Enable this for simulating Kafka interaction for local development
-development: False
+development: True
 
 # Enable this if you want to query Kafka but not interact with Dynatrace
 kafka_only: True
+
+# Aim to be conservative and not too close to actual Dynatrace limit
+send_byte_size_limit: 12000
 
 # Enable this for enabling debug output
 debug: True

@@ -5,6 +5,7 @@ import requests
 import urllib.parse
 import json
 import pprint
+import math
 
 import common
 from common.default import *
@@ -575,6 +576,51 @@ def get_tenant_threshold_list(url_tenant, f_headers,
 
         return return_list
 
+def split_large_request(dict_metrics, byte_size_limit):
+
+    byte_size_limit = byte_size_limit if byte_size_limit is not None else 10000
+    byte_size_total = len(json.dumps(dict_metrics).encode('utf-8'))
+    log_to_disk('SplitRequest',
+            msg="Total Size and Byte Size Limit - ",
+            kv=kvalue(byte_size_limit=byte_size_limit,
+                      byte_size_total=byte_size_total))
+
+    if byte_size_total < byte_size_limit:
+        # Do not split into smaller requests, yield original dict_metrics
+        log_to_disk('SplitRequest',
+            msg="Will not proceed with splitting")
+        yield dict_metrics
+
+    else:
+        # Ensure we have a 'series' key
+        if 'series' in dict_metrics:
+            
+            # Determine length of series and number of divisions
+            num_series = len(dict_metrics['series'])
+            num_splits = int( math.ceil(byte_size_total / byte_size_limit) )
+            increment = int( math.ceil(num_series / num_splits) )
+            log_to_disk('SplitRequest',
+                msg="Starting Split into Smaller Requests",
+                kv=kvalue(num_splits=num_splits,
+                          num_series=num_series,
+                          increment=increment))
+
+            # Iterate through splits and yield
+            i = 0
+            while i < num_series:
+                j = i + increment
+                j = j if j < num_series else num_series
+                new_dict = {}
+                new_dict['type'] = dict_metrics['type']
+                new_dict['series'] = dict_metrics['series'][i:j]
+                byte_size_smaller_request=len(json.dumps(new_dict).encode('utf-8'))
+                log_to_disk('SplitRequest',
+                msg="Smaller Request",
+                kv=kvalue(splice_start=i,splice_end=j,byte_size_smaller_request=byte_size_smaller_request))
+
+                i+=increment
+                yield new_dict
+
 def push_custom_metrics(url_tenant, f_headers,
                         custom_device, dict_metrics,
                         log_category, error_msg,
@@ -655,6 +701,7 @@ common.default.app_logdir = "log"
 # RUNTIME VARIABLES
 conf_file = 'consumerlag.yaml'
 app_conf = grab_yaml_from_disk(conf_file)
+send_byte_size_limit = app_conf['send_byte_size_limit'] if 'send_byte_size_limit' in app_conf else 10000
 
 authentication_list = app_conf['authentication_list']
 authentication = authentication_list[0]
@@ -833,15 +880,17 @@ while True:
     # Only interact with Dynatrace if a) not using the sample data, and b) not set to kafka_only
     if app_conf['development'] != True and app_conf['kafka_only'] != True:
 
-        push_custom_metrics(url_tenant=url_tenant,
-                            f_headers=f_headers,
-                            custom_device=endpoint_custom_device,
-                            dict_metrics=metrics_to_push,
-                            log_category='APICall',
-                            error_msg="unable to push metrics",
-                            log_key='url_tenant',
-                            log_value=url_tenant
-                            )
+        # Split metrics
+        for final_metrics in split_large_request(metrics_to_push, byte_size_limit=send_byte_size_limit):
+            push_custom_metrics(url_tenant=url_tenant,
+                                f_headers=f_headers,
+                                custom_device=endpoint_custom_device,
+                                dict_metrics=final_metrics,
+                                log_category='APICall',
+                                error_msg="unable to push metrics",
+                                log_key='url_tenant',
+                                log_value=url_tenant
+                                )
 
     log_to_disk('Loop',
                 msg="Finished",
